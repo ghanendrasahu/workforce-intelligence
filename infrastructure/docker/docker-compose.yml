@@ -1,0 +1,73 @@
+name: workforce-intelligence
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: workforce
+      POSTGRES_PASSWORD: workforce_dev_only
+      POSTGRES_DB: workforce
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workforce"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlruns/mlflow.db
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlruns:/mlruns
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATA_DIR: /artifacts/data
+      MODELS_DIR: /artifacts/models
+      METRICS_DIR: /artifacts/metrics
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+      AZURE_USE_CLI_CREDENTIAL: ${AZURE_USE_CLI_CREDENTIAL:-false}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./artifacts:/artifacts:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+    environment:
+      API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./artifacts:/artifacts:ro
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  mlruns:
