@@ -30,6 +30,7 @@ def test_salary_raise_reduces_underpaid_cohort_risk(
 def test_local_drivers_sum_to_risk(tiny_stack: TinyStack) -> None:
     reg = tiny_stack["registry"]
     row = reg.latest_row(reg.employee_ids(5)[-1])
+    assert row is not None
     local = reg.local_drivers(row, top_k=10)
     baseline_pp = local["baseline_risk"] * 100  # type: ignore[operator]
     total = baseline_pp + sum(c["risk_points"] for c in local["contributions"])  # type: ignore[union-attr]
@@ -40,6 +41,7 @@ def test_local_drivers_sum_to_risk(tiny_stack: TinyStack) -> None:
 def test_confidence_within_envelope(tiny_stack: TinyStack) -> None:
     reg = tiny_stack["registry"]
     row = reg.latest_row(reg.employee_ids(3)[0])
+    assert row is not None
     res = reg.whatif.simulate(row, InterventionParams(salary_raise_pct=5),
                               lambda x: reg.raw_scores(x))
     assert 0.0 <= res.confidence <= 1.0
