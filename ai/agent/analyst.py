@@ -4,6 +4,7 @@ The LLM orchestrates grounded analytics tools (ai.tools.analytics_tools); it
 never fabricates numbers. If Azure OpenAI is not configured, callers receive a
 clear 503 rather than an ungrounded answer.
 """
+
 from __future__ import annotations
 
 import json
@@ -34,16 +35,21 @@ def _build_client():
         from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
         provider = get_bearer_token_provider(
-            DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
+            DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+        )
         return AzureOpenAI(
             azure_endpoint=endpoint,
             azure_ad_token_provider=provider,
             api_version=settings.azure_openai_api_version,
+            timeout=60.0,
+            max_retries=1,
         )
     return AzureOpenAI(
         api_key=settings.azure_openai_api_key,
         azure_endpoint=endpoint,
         api_version=settings.azure_openai_api_version,
+        timeout=60.0,
+        max_retries=1,
     )
 
 
@@ -64,8 +70,7 @@ def ask_analyst(question: str, registry) -> tuple[str, list[str]]:
     if not settings.agent_configured or deployment is None:
         raise HTTPException(
             status_code=503,
-            detail="AI analyst not configured. Set AZURE_OPENAI_* in .env "
-                   "(see .env.example).",
+            detail="AI analyst not configured. Set AZURE_OPENAI_* in .env (see .env.example).",
         )
 
     from ai.tools import analytics_tools
@@ -89,11 +94,13 @@ def ask_analyst(question: str, registry) -> tuple[str, list[str]]:
         msg = resp.choices[0].message
         if not msg.tool_calls:
             return msg.content or "No answer produced.", tools_used
-        messages.append({
-            "role": "assistant",
-            "content": msg.content,
-            "tool_calls": [tc.model_dump() for tc in msg.tool_calls],
-        })
+        messages.append(
+            {
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": [tc.model_dump() for tc in msg.tool_calls],
+            }
+        )
         for tc in msg.tool_calls:
             if tc.type != "function":
                 continue
@@ -101,11 +108,15 @@ def ask_analyst(question: str, registry) -> tuple[str, list[str]]:
             args = json.loads(tc.function.arguments or "{}")
             result = analytics_tools.execute(name, args)
             tools_used.append(name)
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "content": json.dumps(result)[:6000],
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": json.dumps(result)[:6000],
+                }
+            )
 
-    return "Reached tool-call limit before producing an answer; try narrowing the question.", \
-        tools_used
+    return (
+        "Reached tool-call limit before producing an answer; try narrowing the question.",
+        tools_used,
+    )
