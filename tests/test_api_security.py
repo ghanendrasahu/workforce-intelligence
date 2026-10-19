@@ -1,4 +1,5 @@
 """Security tests: API-key gate + CORS allowlist."""
+
 from __future__ import annotations
 
 import pytest
@@ -28,6 +29,15 @@ def test_health_always_public(_keys_enabled, api_client) -> None:
     assert api_client.get("/health").status_code == 200
 
 
+def test_security_headers_on_health(api_client) -> None:
+    resp = api_client.get("/health")
+    assert resp.headers["x-content-type-options"] == "nosniff"
+    assert resp.headers["x-frame-options"] == "DENY"
+    assert resp.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert resp.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+    assert resp.headers["strict-transport-security"].startswith("max-age=")
+
+
 def test_api_401_without_key(_keys_enabled, api_client) -> None:
     resp = api_client.get("/api/v1/employees/search", params={"q": "", "limit": 1})
     assert resp.status_code == 401
@@ -36,7 +46,8 @@ def test_api_401_without_key(_keys_enabled, api_client) -> None:
 
 def test_api_401_with_wrong_key(_keys_enabled, api_client) -> None:
     resp = api_client.get(
-        "/api/v1/employees/search", params={"q": "", "limit": 1},
+        "/api/v1/employees/search",
+        params={"q": "", "limit": 1},
         headers={"X-API-Key": "nope"},
     )
     assert resp.status_code == 401
@@ -44,7 +55,8 @@ def test_api_401_with_wrong_key(_keys_enabled, api_client) -> None:
 
 def test_api_200_with_valid_key(_keys_enabled, api_client) -> None:
     resp = api_client.get(
-        "/api/v1/employees/search", params={"q": "", "limit": 1},
+        "/api/v1/employees/search",
+        params={"q": "", "limit": 1},
         headers={"X-API-Key": "ci-key-123"},
     )
     assert resp.status_code == 200

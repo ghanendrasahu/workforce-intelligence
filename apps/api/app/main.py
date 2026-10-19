@@ -1,15 +1,17 @@
 """FastAPI application exposing the workforce intelligence engine."""
+
 from __future__ import annotations
 
 import logging
 import secrets
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
 import numpy as np
 import pandas as pd
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai.agent.analyst import ask_analyst
@@ -38,7 +40,9 @@ async def lifespan(app: FastAPI):
     configure_logging(json_logs=settings.log_json, level=settings.log_level)
     logger.info(
         "starting %s v%s (log_json=%s)",
-        settings.app_name, settings.version, settings.log_json,
+        settings.app_name,
+        settings.version,
+        settings.log_json,
     )
     if settings.api_keys:
         logger.info("api auth: %d key(s) configured", len(settings.api_keys))
@@ -51,7 +55,8 @@ async def lifespan(app: FastAPI):
         _state["fingerprint"] = registry.meta.get("data_fingerprint")
         logger.info(
             "model registry loaded: model=%s data_fingerprint=%s",
-            _state["model"], _state["fingerprint"],
+            _state["model"],
+            _state["fingerprint"],
         )
     except FileNotFoundError as exc:
         _state["registry"] = None
@@ -69,9 +74,7 @@ async def lifespan(app: FastAPI):
 _PUBLIC_PATHS = frozenset({"/health", "/docs", "/redoc", "/openapi.json"})
 
 
-def require_api_key(
-    request: Request, x_api_key: Annotated[str | None, Header()] = None
-) -> None:
+def require_api_key(request: Request, x_api_key: Annotated[str | None, Header()] = None) -> None:
     """Gate every route unless ``api_keys`` is empty (auth off) or public."""
     keys = get_settings().api_keys
     if not keys or request.url.path in _PUBLIC_PATHS:
@@ -97,6 +100,20 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=False,
 )
+
+
+@app.middleware("http")
+async def security_headers(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Apply the fleet's baseline security headers to every response."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 
 def reg() -> ModelRegistry:
@@ -197,8 +214,12 @@ def high_risk(top_k: int = 25) -> list[dict]:
 
 
 @app.get("/api/v1/analytics/cohort")
-def cohort(department: str | None = None, location: str | None = None,
-           level_min: int = 1, level_max: int = 5) -> dict:
+def cohort(
+    department: str | None = None,
+    location: str | None = None,
+    level_min: int = 1,
+    level_max: int = 5,
+) -> dict:
     return reg().cohort_analysis(department, location, level_min, level_max)
 
 
@@ -216,8 +237,7 @@ def whatif_simulate(payload: WhatIfRequest) -> dict:
     row = r.latest_row(payload.employee_id)
     if row is None:
         raise HTTPException(status_code=404, detail=f"Unknown employee {payload.employee_id}")
-    result = r.whatif.simulate(row, payload.interventions,
-                               lambda rows: r.raw_scores(rows))
+    result = r.whatif.simulate(row, payload.interventions, lambda rows: r.raw_scores(rows))
     return {
         "employee_id": payload.employee_id,
         **result.__dict__,
@@ -238,11 +258,12 @@ def whatif_scenario(payload: ScenarioRequest) -> dict:
         risks = pd.Series(r.calibrated_scores(sub), index=sub.index)
         sub = sub[risks >= payload.min_risk]
     sub = sub.head(payload.limit)
-    scenario = r.whatif.cohort_scenario(sub, payload.interventions,
-                                        lambda rows: r.raw_scores(rows))
+    scenario = r.whatif.cohort_scenario(sub, payload.interventions, lambda rows: r.raw_scores(rows))
     scenario["filter"] = {
-        "department": payload.department, "location": payload.location,
-        "level_min": payload.level_min, "level_max": payload.level_max,
+        "department": payload.department,
+        "location": payload.location,
+        "level_min": payload.level_min,
+        "level_max": payload.level_max,
         "min_risk": payload.min_risk,
     }
     return scenario
@@ -252,5 +273,4 @@ def whatif_scenario(payload: ScenarioRequest) -> dict:
 @app.post("/api/v1/agent/ask", response_model=AgentAskResponse)
 def agent_ask(payload: AgentAskRequest) -> AgentAskResponse:
     answer, tools_used = ask_analyst(payload.question, reg())
-    return AgentAskResponse(answer=answer, tools_used=tools_used,
-                            configured=True)
+    return AgentAskResponse(answer=answer, tools_used=tools_used, configured=True)

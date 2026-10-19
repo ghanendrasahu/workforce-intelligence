@@ -6,11 +6,16 @@ One identity across every dashboard:
   * 32/24/20/16/14/13 type scale, 1120px content cap
   * semantic colour tokens (success / warning / danger / neutral)
   * Lucide-style inline SVG icons instead of emoji
-  * Streamlit chrome (toolbar, Deploy button, menu, footer) removed
+  * Streamlit chrome (Deploy button, menu, footer) hidden; a slim header
+    keeps the sidebar toggle reachable
+
+Vendored copy: keep byte-identical across the fleet. Canonical source:
+``render-configs/fleet_ui.py``; sync and drift check with
+``render-configs/sync_fleet_ui.py``.
 
 Usage:
     import ui
-    ui.setup("Credit Risk", layout="wide")
+    ui.setup("Overview", layout="wide")
     ui.page_header("Credit Risk", "Estimate ...", eyebrow="Credit Risk Lab")
     ui.section("Applicant details", "...")
     ui.empty_state("No assessment yet", "Fill in the form ...")
@@ -625,6 +630,7 @@ def setup(
     *,
     icon: str | Path | None = None,
     layout: Literal["centered", "wide"] = "wide",
+    sidebar_state: Literal["auto", "expanded", "collapsed"] = "auto",
 ) -> None:
     """Configure the page and inject the shared theme. Call once, first."""
     icon_value: str | None = None
@@ -637,7 +643,7 @@ def setup(
         page_title=page_title,
         page_icon=icon_value,
         layout=layout,
-        initial_sidebar_state="auto",
+        initial_sidebar_state=sidebar_state,
     )
     st.markdown(CSS, unsafe_allow_html=True)
 
