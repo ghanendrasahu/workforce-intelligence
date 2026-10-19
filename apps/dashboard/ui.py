@@ -21,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import streamlit as st
 
@@ -620,7 +621,10 @@ button[data-baseweb="tab"][aria-selected="true"] {{ color: var(--ui-text) !impor
 
 
 def setup(
-    page_title: str, *, icon: str | Path | None = None, layout: str = "wide"
+    page_title: str,
+    *,
+    icon: str | Path | None = None,
+    layout: Literal["centered", "wide"] = "wide",
 ) -> None:
     """Configure the page and inject the shared theme. Call once, first."""
     icon_value: str | None = None
@@ -669,9 +673,7 @@ def page_header(
     mark_html = (
         mark(42)
         if show_mark
-        else (
-            f'<span class="ui-empty-icon" style="margin:0">{svg(icon_name, 20)}</span>'
-        )
+        else (f'<span class="ui-empty-icon" style="margin:0">{svg(icon_name, 20)}</span>')
     )
     st.markdown(
         f'<div class="ui-header"><div class="ui-header-main">{mark_html}'
@@ -689,9 +691,7 @@ def section(title: str, description: str = "") -> None:
     )
 
 
-def empty_state(
-    title: str, body: str = "", *, hint: str = "", icon_name: str = "sparkles"
-) -> None:
+def empty_state(title: str, body: str = "", *, hint: str = "", icon_name: str = "sparkles") -> None:
     hint_html = f'<div class="ui-empty-hint">{hint}</div>' if hint else ""
     st.markdown(
         f'<div class="ui-empty"><span class="ui-empty-icon">{svg(icon_name, 22)}</span>'
@@ -732,8 +732,7 @@ def _metric_html(
             tone = "good" if (rising == (good_direction == "up")) else "bad"
         arrow = "arrow-up" if delta > 0 else "arrow-down"
         delta_html = (
-            f'<div class="ui-metric-delta {tone}">{svg(arrow, 13)}'
-            f"{delta:+.1f}{suffix}</div>"
+            f'<div class="ui-metric-delta {tone}">{svg(arrow, 13)}{delta:+.1f}{suffix}</div>'
         )
     caption_html = f'<div class="ui-metric-caption">{caption}</div>' if caption else ""
     return (
@@ -838,6 +837,7 @@ def app_icon(assets_dir: Path) -> Path | None:
             return candidate
     return None
 
+
 def meter(value: float, *, tone: str = "primary", caption: str = "") -> None:
     """Horizontal probability meter with an optional caption below it."""
     pct = max(0.0, min(1.0, float(value))) * 100
@@ -847,9 +847,7 @@ def meter(value: float, *, tone: str = "primary", caption: str = "") -> None:
         "warning": WARNING,
         "danger": DANGER,
     }.get(tone, PRIMARY)
-    caption_html = (
-        f'<div class="ui-meter-label"><span>{caption}</span></div>' if caption else ""
-    )
+    caption_html = f'<div class="ui-meter-label"><span>{caption}</span></div>' if caption else ""
     st.markdown(
         f'<div class="ui-meter"><span style="width:{pct:.1f}%;background:{colour}"></span></div>'
         f"{caption_html}",
