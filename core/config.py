@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     seed: int = 42
 
+    # Observability
+    log_json: bool = False
+    log_level: str = "INFO"
+
     # Artifact paths
     data_dir: Path = Path("artifacts/data")
     models_dir: Path = Path("artifacts/models")

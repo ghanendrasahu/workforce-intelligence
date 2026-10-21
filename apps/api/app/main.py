@@ -1,6 +1,7 @@
 """FastAPI application exposing the workforce intelligence engine."""
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -21,19 +22,31 @@ from apps.api.app.schemas import (
     WhatIfRequest,
 )
 from core.config import get_settings
+from core.logging import configure_logging
 from ml.inference.predictor import ModelRegistry, get_registry
 
 _state: dict[str, object] = {}
+
+logger = logging.getLogger("apps.api")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    configure_logging(json_logs=settings.log_json, level=settings.log_level)
+    logger.info(
+        "starting %s v%s (log_json=%s)",
+        settings.app_name, settings.version, settings.log_json,
+    )
     try:
         registry = get_registry()
         _state["registry"] = registry
         _state["model"] = registry.meta.get("best_model_name")
         _state["fingerprint"] = registry.meta.get("data_fingerprint")
+        logger.info(
+            "model registry loaded: model=%s data_fingerprint=%s",
+            _state["model"], _state["fingerprint"],
+        )
     except FileNotFoundError as exc:
         _state["registry"] = None
         _state["error"] = (
@@ -41,7 +54,9 @@ async def lifespan(app: FastAPI):
             f"Run `python -m data.ingestion.synthetic_generator` and "
             f"`python -m ml.training.train` first. ({exc})"
         )
+        logger.error("startup degraded: %s", _state["error"])
     yield
+    logger.info("shutdown")
 
 
 app = FastAPI(
