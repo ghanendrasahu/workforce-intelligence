@@ -26,4 +26,4 @@ jobs:
         run: mypy core data ml ai apps
 
       - name: Tests (pytest)
-        run: pytest tests/ -p no:warnings -q
+        run: pytest tests/ -p no:warnings -q --cov=core --cov=data --cov=ml --cov=ai --cov=apps --cov-report=term-missing --cov-fail-under=70
