@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai.agent.analyst import ask_analyst
@@ -38,6 +40,10 @@ async def lifespan(app: FastAPI):
         "starting %s v%s (log_json=%s)",
         settings.app_name, settings.version, settings.log_json,
     )
+    if settings.api_keys:
+        logger.info("api auth: %d key(s) configured", len(settings.api_keys))
+    else:
+        logger.warning("api auth DISABLED: no API_KEYS configured")
     try:
         registry = get_registry()
         _state["registry"] = registry
@@ -59,17 +65,37 @@ async def lifespan(app: FastAPI):
     logger.info("shutdown")
 
 
+# Health/docs stay probe-accessible; everything else may require a key.
+_PUBLIC_PATHS = frozenset({"/health", "/docs", "/redoc", "/openapi.json"})
+
+
+def require_api_key(
+    request: Request, x_api_key: Annotated[str | None, Header()] = None
+) -> None:
+    """Gate every route unless ``api_keys`` is empty (auth off) or public."""
+    keys = get_settings().api_keys
+    if not keys or request.url.path in _PUBLIC_PATHS:
+        return
+    if not x_api_key or not any(
+        secrets.compare_digest(x_api_key.encode(), key.encode()) for key in keys
+    ):
+        logger.warning("rejected client: invalid or missing API key path=%s", request.url.path)
+        raise HTTPException(status_code=401, detail="Missing or invalid API key")
+
+
 app = FastAPI(
     title=get_settings().app_name,
     version=get_settings().version,
     lifespan=lifespan,
+    dependencies=[Depends(require_api_key)],
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=get_settings().cors_origins,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
+    allow_credentials=False,
 )
 
 

@@ -43,6 +43,8 @@ services:
       DATA_DIR: /artifacts/data
       MODELS_DIR: /artifacts/models
       METRICS_DIR: /artifacts/metrics
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      API_KEYS: ${API_KEYS:-}
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
       AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
@@ -61,6 +63,7 @@ services:
       dockerfile: apps/dashboard/Dockerfile
     environment:
       API_BASE_URL: http://api:8000
+      API_KEY: ${API_KEYS:-}
     ports:
       - "8501:8501"
     volumes:
