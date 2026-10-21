@@ -16,8 +16,11 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-      - name: Install project + dev deps
-        run: pip install -e ".[dev]"
+      - name: Install locked dependencies
+        # Deterministic tree from requirements.lock (regenerate on dep changes).
+        run: |
+          pip install -r requirements.lock
+          pip install -e . --no-deps
 
       - name: Lint (ruff)
         run: ruff check .
