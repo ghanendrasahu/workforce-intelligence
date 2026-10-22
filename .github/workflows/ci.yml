@@ -31,6 +31,9 @@ jobs:
       - name: Tests (pytest)
         run: pytest tests/ -p no:warnings -q --cov=core --cov=data --cov=ml --cov=ai --cov=apps --cov-report=term-missing --cov-fail-under=70
 
+      - name: Check the deployment entry points
+        run: bash -n setup.sh
+
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
