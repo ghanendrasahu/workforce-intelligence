@@ -7,7 +7,8 @@
 # pre-trained artifact set in seconds.
 FROM python:3.11-slim AS wheels
 
-ENV PIP_NO_CACHE_DIR=1
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DEFAULT_TIMEOUT=120
 
 WORKDIR /build
 COPY requirements.lock ./requirements.lock
