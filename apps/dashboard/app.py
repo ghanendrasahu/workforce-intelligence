@@ -1,4 +1,5 @@
 """Workforce Intelligence executive dashboard (Streamlit)."""
+
 import sys
 from pathlib import Path
 
@@ -8,42 +9,64 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import streamlit as st
+import streamlit as st  # noqa: E402
+import ui  # noqa: E402
 
 import apps.dashboard.client as api  # noqa: E402
 
-st.set_page_config(
-    page_title="Workforce Intelligence",
-    page_icon=":material/insights:",
-    layout="wide",
-)
+ASSETS = Path(__file__).resolve().parent / "assets"
 
-overview = st.Page("app_pages/overview.py", title="Overview",
-                   icon=":material/dashboard:", default=True)
-employees = st.Page("app_pages/employees.py", title="Employee risk",
-                    icon=":material/person_search:")
-simulator = st.Page("app_pages/simulator.py", title="What-if simulator",
-                    icon=":material/tune:")
-analyst = st.Page("app_pages/analyst.py", title="AI analyst",
-                  icon=":material/smart_toy:")
+ui.setup("Workforce Intelligence", icon=ui.app_icon(ASSETS))
+
+overview = st.Page("app_pages/overview.py", title="Overview", default=True)
+employees = st.Page("app_pages/employees.py", title="Employee risk")
+simulator = st.Page("app_pages/simulator.py", title="What-if simulator")
+analyst = st.Page("app_pages/analyst.py", title="AI analyst")
 
 try:
     health = api.get("/health")
-except api.ApiError as exc:
-    st.error(str(exc))
+except api.ApiError:
+    ui.page_header(
+        "Workforce intelligence",
+        "Attrition risk, retention drivers and team health across the enterprise.",
+        eyebrow="PEOPLE ANALYTICS",
+        badge="Service unavailable",
+        badge_tone="danger",
+        icon_name="briefcase",
+    )
+    ui.error_state(
+        "The analytics service is not responding right now. It may be waking up.",
+        title="Dashboard unavailable",
+        hint="Refresh the page in a moment.",
+    )
     st.stop()
 
 if health.get("status") != "ok":
-    st.error("API is running but artifacts are missing - generate data and train "
-             "models first (see README quickstart).")
+    ui.page_header(
+        "Workforce intelligence",
+        "Attrition risk, retention drivers and team health across the enterprise.",
+        eyebrow="PEOPLE ANALYTICS",
+        badge="Models not ready",
+        badge_tone="warning",
+        icon_name="briefcase",
+    )
+    ui.error_state(
+        "The analytics service is running but its trained models are not ready yet.",
+        title="Models not ready",
+        hint="Refresh once the deployment has finished starting.",
+    )
     st.stop()
 
 with st.sidebar:
-    model_name = health.get("model_name") or "?"
-    fp = str(health.get("data_fingerprint") or "")[:8]
-    st.markdown(f"**:material/model_training:** model `{model_name}`")
-    st.caption(f"data fingerprint {fp}")
+    st.markdown(
+        ui.badge("Model ready", "success"),
+        unsafe_allow_html=True,
+    )
+    model_name = health.get("model_name") or "attrition model"
+    st.caption(f"Scoring model: {model_name}")
+    fingerprint = str(health.get("data_fingerprint") or "")[:8]
+    if fingerprint:
+        st.caption(f"Data snapshot: {fingerprint}")
 
-pg = st.navigation([overview, employees, simulator, analyst],
-                   position="sidebar")
+pg = st.navigation([overview, employees, simulator, analyst], position="sidebar")
 pg.run()
