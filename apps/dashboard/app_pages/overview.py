@@ -111,6 +111,8 @@ with left:
             trend_df,
             x="date",
             y="annualized_rate",
+            x_label="Month",
+            y_label="Annualized attrition (%)",
             color=ui.PRIMARY,
             height=280,
         )
