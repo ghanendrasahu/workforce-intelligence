@@ -1,7 +1,16 @@
 """Workforce Intelligence executive dashboard (Streamlit)."""
+import sys
+from pathlib import Path
+
+# `streamlit run apps/dashboard/app.py` only puts apps/dashboard on sys.path.
+# Add the repo root so `apps.dashboard.client` and the page modules resolve.
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 import streamlit as st
 
-import apps.dashboard.client as api
+import apps.dashboard.client as api  # noqa: E402
 
 st.set_page_config(
     page_title="Workforce Intelligence",
