@@ -10,6 +10,10 @@ probability score.
 > **Data is synthetic by design** - generated from a known causal structure so every
 > claim (driver attribution, intervention direction, discrimination ceiling) is testable.
 
+> **Live demo:** https://workforce-intelligence-ui.onrender.com
+>
+> Free-tier hosting: the first load after idle can take 30-60 seconds.
+
 ## The difference
 
 Most portfolio projects stop at `employee data → XGBoost → 82% attrition probability`.
